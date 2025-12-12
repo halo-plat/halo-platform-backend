@@ -4,6 +4,8 @@ from uuid import uuid4
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from app.ai_provider import ConversationAIProvider
+
 
 class ConversationRequest(BaseModel):
     session_id: str | None = None
@@ -18,12 +20,15 @@ class ConversationResponse(BaseModel):
 
 app = FastAPI(
     title="Halo Backend – Conversation Orchestrator",
-    version="0.1.0",
+    version="0.2.0",
     description=(
         "Core API for orchestrating conversational sessions between "
         "Halo clients (mobile/glasses) and downstream AI providers."
     ),
 )
+
+# For MVP 1.0 a single global provider instance is sufficient.
+provider = ConversationAIProvider()
 
 
 @app.get("/health", tags=["system"])
@@ -47,19 +52,17 @@ async def handle_conversation_message(payload: ConversationRequest) -> Conversat
     """
     Handle a single user utterance within a conversational session.
 
-    For MVP 1.0 this implementation is intentionally minimal:
-    - if session_id is not provided, a new session_id is generated;
-    - the assistant reply is a stubbed echo of the user utterance.
-
-    In future iterations this endpoint will:
-    - call the AI provider(s) selected in SAD and RTM;
-    - apply orchestration rules (context, safety, logging);
-    - integrate with monitoring and audit logging.
+    The orchestration responsibilities are:
+    - manage the session identifier;
+    - delegate reply generation to the AI provider abstraction;
+    - enforce a consistent response schema for downstream clients.
     """
     session_id = payload.session_id or str(uuid4())
 
-    # Stubbed reply for MVP skeleton
-    reply_text = f"Echo: {payload.user_utterance}"
+    reply_text = await provider.generate_reply(
+        user_utterance=payload.user_utterance,
+        session_context={"session_id": session_id},
+    )
 
     return ConversationResponse(
         session_id=session_id,
