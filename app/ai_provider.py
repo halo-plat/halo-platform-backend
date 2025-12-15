@@ -62,7 +62,7 @@ class ConversationAIProvider:
 
         model = os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
         url = "https://api.openai.com/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {key}"}
+        headers = {"Authorization": f"Bearer {key}", "Accept": "application/json", "User-Agent": "halo-mvp/0.1"}
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": user_utterance}],
@@ -86,7 +86,7 @@ class ConversationAIProvider:
 
         model = os.getenv("PERPLEXITY_MODEL") or "sonar"
         url = "https://api.perplexity.ai/chat/completions"
-        headers = {"Authorization": f"Bearer {key}"}
+        headers = {"Authorization": f"Bearer {key}", "Accept": "application/json", "User-Agent": "halo-mvp/0.1"}
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": user_utterance}],
@@ -151,3 +151,4 @@ class ConversationAIProvider:
             return ProviderResult(txt, provider_name, f"{provider_name.value}_openai_compatible")
         except Exception as e:
             return ProviderResult(f"ECHO: {user_utterance}", AIProviderId.ECHO, f"fallback_{provider_name.value}_error:{type(e).__name__}")
+
