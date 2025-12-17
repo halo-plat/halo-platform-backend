@@ -98,3 +98,50 @@ def pick_default_provider() -> AIProviderId:
         return AIProviderId(v)
     except Exception:
         return AIProviderId.ECHO
+
+# --- Auto-routing policy (MVP) ---
+def _env_truthy(name: str) -> bool:
+    import os
+    v = (os.getenv(name) or "").strip().lower()
+    return v in ("1", "true", "yes", "y", "on")
+
+
+def pick_provider_for_request(user_text: str) -> AIProviderId:
+    """
+    Policy-based provider selection when there is NO explicit voice override.
+    Enable with HALO_AI_AUTO_ROUTING=1.
+    """
+    default_provider = pick_default_provider()
+
+    if not _env_truthy("HALO_AI_AUTO_ROUTING"):
+        return default_provider
+
+    t = (user_text or "").strip().lower()
+
+    # Calendar / scheduling intent -> Notion Calendar (placeholder)
+    cal_tokens = (
+        "calendario", "agenda", "appuntamento", "riunione", "meeting",
+        "notion calendar", "notion calendario", "invito", "invita", "schedule",
+    )
+    if any(tok in t for tok in cal_tokens):
+        return AIProviderId.NOTION_CALENDAR
+
+    # OS / tool action intent -> Pro Actor (placeholder)
+    action_tokens = (
+        "trova file", "cerca file", "localizza file", "apri file", "invia file",
+        "manda file", "carica file", "upload", "download", "salva", "sposta file",
+        "open file", "find file", "send file",
+    )
+    if any(tok in t for tok in action_tokens):
+        return AIProviderId.PRO_ACTOR
+
+    # Web/search/news intent -> Perplexity
+    search_tokens = (
+        "news", "notizie", "oggi", "ieri", "ultima", "ultime", "latest", "recent",
+        "prezzo", "quanto costa", "costi", "media", "con fonti", "fonti", "citazioni",
+        "sources", "cita le fonti", "cerca", "ricerca", "search", "web",
+    )
+    if any(tok in t for tok in search_tokens):
+        return AIProviderId.PERPLEXITY
+
+    return default_provider
