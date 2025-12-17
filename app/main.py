@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from app.ai_provider import ConversationAIProvider
 from app.audio_routing import AudioRoute, infer_audio_route_override_from_text
 from app.provider_types import AIProviderId
-from app.provider_selection import infer_ai_provider_override_from_text, pick_default_provider
+from app.provider_selection import infer_ai_provider_override_from_text, pick_provider_for_request
 
 
 class ConversationRequest(BaseModel):
@@ -84,8 +84,12 @@ async def handle_conversation_message(payload: ConversationRequest) -> Conversat
         routing_reason = "session_locked" if st.get("ai_provider") is not None else "default_policy"
 
     # Requested provider
-    requested: AIProviderId = st["ai_provider"] if st.get("ai_provider") is not None else pick_default_provider()
+    requested: AIProviderId = st["ai_provider"] if st.get("ai_provider") is not None else pick_provider_for_request(payload.user_utterance)
 
+    # Persist provider chosen by default_policy so follow-ups become session_locked
+    if st.get("ai_provider") is None:
+        st["ai_provider"] = requested
+    
     # Provider call (falls back internally if missing keys)
     result = await provider.generate_reply(
         user_utterance=payload.user_utterance,
@@ -103,3 +107,6 @@ async def handle_conversation_message(payload: ConversationRequest) -> Conversat
         ai_provider_applied=result.provider_applied.value,
         ai_routing_reason=f"{routing_reason}:{result.routing_note}",
     )
+
+
+
