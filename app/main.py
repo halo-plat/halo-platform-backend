@@ -16,6 +16,7 @@ from app.provider_selection import infer_ai_provider_override_from_text, pick_pr
 class ConversationRequest(BaseModel):
     session_id: str | None = None
     user_utterance: str
+    audio_route_request: AudioRoute | None = None  # MVP hint (client preference/policy)
 
 
 class ConversationResponse(BaseModel):
@@ -74,6 +75,9 @@ async def handle_conversation_message(payload: ConversationRequest) -> Conversat
         st["audio_route"] = audio_override
         audio_cues.append("confirm")
 
+    elif payload.audio_route_request is not None:
+        st["audio_route"] = payload.audio_route_request
+        audio_cues.append("confirm")
     # AI provider override (voice)
     ai_override = infer_ai_provider_override_from_text(payload.user_utterance)
     if ai_override is not None:
