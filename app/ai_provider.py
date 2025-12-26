@@ -58,7 +58,11 @@ class ConversationAIProvider:
     async def _openai(self, user_utterance: str) -> ProviderResult:
         key = os.getenv("OPENAI_API_KEY") or ""
         if not key:
-            return ProviderResult(f"ECHO: {user_utterance}", AIProviderId.ECHO, "fallback_missing_OPENAI_API_KEY")
+            return ProviderResult(
+                reply_text=f"ECHO: {user_utterance}",
+                provider_applied=AIProviderId.OPENAI,
+                routing_note="degraded_missing_OPENAI_API_KEY",
+            )
 
         model = os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
         url = "https://api.openai.com/v1/chat/completions"
@@ -77,12 +81,20 @@ class ConversationAIProvider:
                 txt = data["choices"][0]["message"]["content"]
             return ProviderResult(txt, AIProviderId.OPENAI, "openai_chat_completions")
         except Exception as e:
-            return ProviderResult(f"ECHO: {user_utterance}", AIProviderId.ECHO, f"fallback_openai_error:{type(e).__name__}")
+            return ProviderResult(
+                reply_text=f"ECHO: {user_utterance}",
+                provider_applied=AIProviderId.OPENAI,
+                routing_note=f"degraded_openai_error:{type(e).__name__}",
+            )
 
     async def _perplexity(self, user_utterance: str) -> ProviderResult:
         key = os.getenv("PERPLEXITY_API_KEY") or ""
         if not key:
-            return ProviderResult(f"ECHO: {user_utterance}", AIProviderId.ECHO, "fallback_missing_PERPLEXITY_API_KEY")
+            return ProviderResult(
+                reply_text=f"ECHO: {user_utterance}",
+                provider_applied=AIProviderId.PERPLEXITY,
+                routing_note="degraded_missing_PERPLEXITY_API_KEY",
+            )
 
         model = os.getenv("PERPLEXITY_MODEL") or "sonar"
         url = "https://api.perplexity.ai/chat/completions"
@@ -101,12 +113,20 @@ class ConversationAIProvider:
                 txt = data["choices"][0]["message"]["content"]
             return ProviderResult(txt, AIProviderId.PERPLEXITY, "perplexity_chat_completions")
         except Exception as e:
-            return ProviderResult(f"ECHO: {user_utterance}", AIProviderId.ECHO, f"fallback_perplexity_error:{type(e).__name__}")
+            return ProviderResult(
+                reply_text=f"ECHO: {user_utterance}",
+                provider_applied=AIProviderId.PERPLEXITY,
+                routing_note=f"degraded_perplexity_error:{type(e).__name__}",
+            )
 
     async def _gemini(self, user_utterance: str) -> ProviderResult:
         key = os.getenv("GEMINI_API_KEY") or ""
         if not key:
-            return ProviderResult(f"ECHO: {user_utterance}", AIProviderId.ECHO, "fallback_missing_GEMINI_API_KEY")
+            return ProviderResult(
+                reply_text=f"ECHO: {user_utterance}",
+                provider_applied=AIProviderId.CLOUD_AI,
+                routing_note="degraded_missing_GEMINI_API_KEY",
+            )
 
         model = os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -121,7 +141,11 @@ class ConversationAIProvider:
                 txt = data["candidates"][0]["content"]["parts"][0]["text"]
             return ProviderResult(txt, AIProviderId.CLOUD_AI, "gemini_generateContent")
         except Exception as e:
-            return ProviderResult(f"ECHO: {user_utterance}", AIProviderId.ECHO, f"fallback_gemini_error:{type(e).__name__}")
+            return ProviderResult(
+                reply_text=f"ECHO: {user_utterance}",
+                provider_applied=AIProviderId.CLOUD_AI,
+                routing_note=f"degraded_gemini_error:{type(e).__name__}",
+            )
 
     async def _openai_compatible(
         self,
@@ -132,7 +156,11 @@ class ConversationAIProvider:
         provider_name: AIProviderId,
     ) -> ProviderResult:
         if not base_url or not api_key:
-            return ProviderResult(f"ECHO: {user_utterance}", AIProviderId.ECHO, f"fallback_missing_{provider_name.value}_config")
+            return ProviderResult(
+                reply_text=f"ECHO: {user_utterance}",
+                provider_applied=provider_name,
+                routing_note=f"degraded_missing_{provider_name.value}_config",
+            )
 
         url = base_url.rstrip("/") + "/chat/completions"
         headers = {"Authorization": f"Bearer {api_key}"}
@@ -150,5 +178,9 @@ class ConversationAIProvider:
                 txt = data["choices"][0]["message"]["content"]
             return ProviderResult(txt, provider_name, f"{provider_name.value}_openai_compatible")
         except Exception as e:
-            return ProviderResult(f"ECHO: {user_utterance}", AIProviderId.ECHO, f"fallback_{provider_name.value}_error:{type(e).__name__}")
+            return ProviderResult(
+                reply_text=f"ECHO: {user_utterance}",
+                provider_applied=provider_name,
+                routing_note=f"degraded_{provider_name.value}_error:{type(e).__name__}",
+            )
 
