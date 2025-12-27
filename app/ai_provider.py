@@ -74,7 +74,7 @@ class ConversationAIProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=25) as client:
+            async with httpx.AsyncClient(timeout=float(os.getenv("HALO_AI_UPSTREAM_TIMEOUT_SEC") or "60")) as client:
                 r = await client.post(url, headers=headers, json=payload)
                 r.raise_for_status()
                 data = r.json()
@@ -106,7 +106,7 @@ class ConversationAIProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=25) as client:
+            async with httpx.AsyncClient(timeout=float(os.getenv("HALO_AI_UPSTREAM_TIMEOUT_SEC") or "60")) as client:
                 r = await client.post(url, headers=headers, json=payload)
                 r.raise_for_status()
                 data = r.json()
@@ -134,7 +134,7 @@ class ConversationAIProvider:
         payload = {"contents": [{"parts": [{"text": user_utterance}]}]}
 
         try:
-            async with httpx.AsyncClient(timeout=25) as client:
+            async with httpx.AsyncClient(timeout=float(os.getenv("HALO_AI_UPSTREAM_TIMEOUT_SEC") or "60")) as client:
                 r = await client.post(url, headers=headers, json=payload)
                 r.raise_for_status()
                 data = r.json()
@@ -171,7 +171,7 @@ class ConversationAIProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=25) as client:
+            async with httpx.AsyncClient(timeout=float(os.getenv("HALO_AI_UPSTREAM_TIMEOUT_SEC") or "60")) as client:
                 r = await client.post(url, headers=headers, json=payload)
                 r.raise_for_status()
                 data = r.json()
