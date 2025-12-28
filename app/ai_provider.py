@@ -60,7 +60,7 @@ class ConversationAIProvider:
         if not key:
             return ProviderResult(
                 reply_text=f"ECHO: {user_utterance}",
-                provider_applied=AIProviderId.OPENAI,
+                provider_applied=AIProviderId.ECHO,
                 routing_note="degraded_missing_OPENAI_API_KEY",
             )
 
@@ -83,7 +83,7 @@ class ConversationAIProvider:
         except Exception as e:
             return ProviderResult(
                 reply_text=f"ECHO: {user_utterance}",
-                provider_applied=AIProviderId.OPENAI,
+                provider_applied=AIProviderId.ECHO,
                 routing_note=f"degraded_openai_error:{type(e).__name__}",
             )
 
@@ -92,7 +92,7 @@ class ConversationAIProvider:
         if not key:
             return ProviderResult(
                 reply_text=f"ECHO: {user_utterance}",
-                provider_applied=AIProviderId.PERPLEXITY,
+                provider_applied=AIProviderId.ECHO,
                 routing_note="degraded_missing_PERPLEXITY_API_KEY",
             )
 
@@ -115,7 +115,7 @@ class ConversationAIProvider:
         except Exception as e:
             return ProviderResult(
                 reply_text=f"ECHO: {user_utterance}",
-                provider_applied=AIProviderId.PERPLEXITY,
+                provider_applied=AIProviderId.ECHO,
                 routing_note=f"degraded_perplexity_error:{type(e).__name__}",
             )
 
@@ -124,7 +124,7 @@ class ConversationAIProvider:
         if not key:
             return ProviderResult(
                 reply_text=f"ECHO: {user_utterance}",
-                provider_applied=AIProviderId.CLOUD_AI,
+                provider_applied=AIProviderId.ECHO,
                 routing_note="degraded_missing_GEMINI_API_KEY",
             )
 
@@ -143,7 +143,7 @@ class ConversationAIProvider:
         except Exception as e:
             return ProviderResult(
                 reply_text=f"ECHO: {user_utterance}",
-                provider_applied=AIProviderId.CLOUD_AI,
+                provider_applied=AIProviderId.ECHO,
                 routing_note=f"degraded_gemini_error:{type(e).__name__}",
             )
 
