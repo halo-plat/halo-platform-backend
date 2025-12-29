@@ -10,3 +10,6 @@ __pycache__/
 uvicorn*.log
 *.out.log
 *.err.log
+
+# Local CI logs
+/tools/uvicorn.*.log*
