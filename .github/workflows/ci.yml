@@ -1,0 +1,62 @@
+﻿name: CI
+
+on:
+  push:
+    branches: [ "main", "feature/**" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-ci-harness:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout backend
+        uses: actions/checkout@v4
+        with:
+          path: halo-platform-backend
+
+      - name: Checkout QA (sibling repo)
+        uses: actions/checkout@v4
+        with:
+          repository: halo-plat/halo-platform-qa
+          path: halo-platform-qa
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps (backend + QA) and run harness
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          # Backend venv + deps
+          python -m venv .\halo-platform-backend\.venv
+          .\halo-platform-backend\.venv\Scripts\python.exe -m pip install -U pip pytest
+          if (Test-Path ".\halo-platform-backend\requirements.txt") {
+            .\halo-platform-backend\.venv\Scripts\python.exe -m pip install -r .\halo-platform-backend\requirements.txt
+          }
+          if (Test-Path ".\halo-platform-backend\requirements-dev.txt") {
+            .\halo-platform-backend\.venv\Scripts\python.exe -m pip install -r .\halo-platform-backend\requirements-dev.txt
+          }
+
+          # QA venv + deps
+          python -m venv .\halo-platform-qa\.venv
+          .\halo-platform-qa\.venv\Scripts\python.exe -m pip install -U pip pytest
+          if (Test-Path ".\halo-platform-qa\requirements.txt") {
+            .\halo-platform-qa\.venv\Scripts\python.exe -m pip install -r .\halo-platform-qa\requirements.txt
+          }
+          if (Test-Path ".\halo-platform-qa\requirements-dev.txt") {
+            .\halo-platform-qa\.venv\Scripts\python.exe -m pip install -r .\halo-platform-qa\requirements-dev.txt
+          }
+
+          # Run harness (backend)
+          Push-Location .\halo-platform-backend
+          .\tools\run_local_ci.ps1 -MaxTenants 1
+          Pop-Location
