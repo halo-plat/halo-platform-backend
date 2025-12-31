@@ -32,6 +32,8 @@ $logFile = Join-Path $BackendRoot ("tools\uvicorn.$Port.log")
 
 # Env for the server under test
 $env:HALO_MAX_TENANTS = $MaxTenants
+if (-not $env:HALO_AI_DEFAULT_PROVIDER) { $env:HALO_AI_DEFAULT_PROVIDER = "perplexity" }
+if (-not $env:HALO_AI_AUTO_ROUTING) { $env:HALO_AI_AUTO_ROUTING = "1" }
 $env:PYTHONFAULTHANDLER = "1"
 
 $proc = $null
