@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from dataclasses import dataclass
@@ -93,7 +93,7 @@ class ConversationAIProvider:
             return ProviderResult(
                 reply_text=f"ECHO: {user_utterance}",
                 provider_applied=AIProviderId.ECHO,
-                routing_note="degraded_missing_PERPLEXITY_API_KEY",
+                routing_note="degraded_perplexity_error:missing_PERPLEXITY_API_KEY",
             )
 
         model = os.getenv("PERPLEXITY_MODEL") or "sonar"
@@ -183,4 +183,5 @@ class ConversationAIProvider:
                 provider_applied=provider_name,
                 routing_note=f"degraded_{provider_name.value}_error:{type(e).__name__}",
             )
+
 

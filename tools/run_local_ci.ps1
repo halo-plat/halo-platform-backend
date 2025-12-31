@@ -32,6 +32,8 @@ $logFile = Join-Path $BackendRoot ("tools\uvicorn.$Port.log")
 
 # Env for the server under test
 $env:HALO_MAX_TENANTS = $MaxTenants
+$script:ORIG_HALO_AI_DEFAULT_PROVIDER = $env:HALO_AI_DEFAULT_PROVIDER
+$script:ORIG_HALO_AI_AUTO_ROUTING = $env:HALO_AI_AUTO_ROUTING
 if (-not $env:HALO_AI_DEFAULT_PROVIDER) { $env:HALO_AI_DEFAULT_PROVIDER = "perplexity" }
 if (-not $env:HALO_AI_AUTO_ROUTING) { $env:HALO_AI_AUTO_ROUTING = "1" }
 $env:PYTHONFAULTHANDLER = "1"
@@ -72,6 +74,9 @@ try {
     Write-Host "RUN QA tests (integration) from: $($QaRoot.Path)"
     Push-Location $QaRoot.Path
     try {
+      # Restore env so QA tests can control provider selection independently
+      if ($null -eq $script:ORIG_HALO_AI_DEFAULT_PROVIDER) { Remove-Item Env:\HALO_AI_DEFAULT_PROVIDER -ErrorAction SilentlyContinue } else { $env:HALO_AI_DEFAULT_PROVIDER = $script:ORIG_HALO_AI_DEFAULT_PROVIDER }
+      if ($null -eq $script:ORIG_HALO_AI_AUTO_ROUTING) { Remove-Item Env:\HALO_AI_AUTO_ROUTING -ErrorAction SilentlyContinue } else { $env:HALO_AI_AUTO_ROUTING = $script:ORIG_HALO_AI_AUTO_ROUTING }
       $env:HALO_BASE_URL = $baseUrl
       & $QaPy -m pytest -q
     } finally {
