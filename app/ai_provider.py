@@ -29,6 +29,18 @@ class ConversationAIProvider:
         if provider_requested == AIProviderId.PERPLEXITY:
             return await self._perplexity(user_utterance)
 
+        if provider_requested == AIProviderId.CLAUDE:
+            return await self._claude(user_utterance)
+
+        if provider_requested == AIProviderId.HUGGINGFACE:
+            return await self._openai_compatible(
+                user_utterance=user_utterance,
+                base_url=os.getenv("HF_BASE_URL") or "",
+                api_key=os.getenv("HF_API_KEY") or "",
+                model=os.getenv("HF_MODEL") or "default",
+                provider_name=AIProviderId.HUGGINGFACE,
+            )
+
         if provider_requested == AIProviderId.CLOUD_AI:
             return await self._gemini(user_utterance)
 
@@ -117,6 +129,46 @@ class ConversationAIProvider:
                 reply_text=f"ECHO: {user_utterance}",
                 provider_applied=AIProviderId.PERPLEXITY,
                 routing_note=f"degraded_perplexity_error:{type(e).__name__}",
+            )
+
+    async def _claude(self, user_utterance: str) -> ProviderResult:
+        key = os.getenv("ANTHROPIC_API_KEY") or ""
+        if not key:
+            return ProviderResult(
+                reply_text=f"ECHO: {user_utterance}",
+                provider_applied=AIProviderId.CLAUDE,
+                routing_note="degraded_missing_ANTHROPIC_API_KEY",
+            )
+
+        model = os.getenv("ANTHROPIC_MODEL") or "claude-3-haiku-20240307"
+        url = "https://api.anthropic.com/v1/messages"
+        headers = {
+            "x-api-key": key,
+            "anthropic-version": (os.getenv("ANTHROPIC_VERSION") or "2023-06-01"),
+            "content-type": "application/json",
+            "user-agent": "halo-mvp/0.1",
+        }
+        payload = {
+            "model": model,
+            "max_tokens": 512,
+            "temperature": 0.2,
+            "messages": [{"role": "user", "content": user_utterance}],
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                r = await client.post(url, headers=headers, json=payload)
+                r.raise_for_status()
+                data = r.json()
+                blocks = data.get("content") or []
+                txt = "".join([b.get("text", "") for b in blocks if isinstance(b, dict)])
+                txt = (txt or "").strip() or f"ECHO: {user_utterance}"
+            return ProviderResult(txt, AIProviderId.CLAUDE, "anthropic_messages_api")
+        except Exception as e:
+            return ProviderResult(
+                reply_text=f"ECHO: {user_utterance}",
+                provider_applied=AIProviderId.CLAUDE,
+                routing_note=f"degraded_claude_error:{type(e).__name__}",
             )
 
     async def _gemini(self, user_utterance: str) -> ProviderResult:
