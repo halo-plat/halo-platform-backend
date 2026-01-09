@@ -1,4 +1,4 @@
-﻿name: CI
+name: CI
 
 on:
   push:
@@ -50,6 +50,9 @@ jobs:
           # QA venv + deps
           python -m venv .\halo-platform-qa\.venv
           .\halo-platform-qa\.venv\Scripts\python.exe -m pip install -U pip pytest
+
+          # QA test deps (TestClient)
+          .\halo-platform-qa\.venv\Scripts\python.exe -m pip install fastapi httpx
           if (Test-Path ".\halo-platform-qa\requirements.txt") {
             .\halo-platform-qa\.venv\Scripts\python.exe -m pip install -r .\halo-platform-qa\requirements.txt
           }
