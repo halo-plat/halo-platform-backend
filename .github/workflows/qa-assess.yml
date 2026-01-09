@@ -1,0 +1,86 @@
+name: QA Assess Evidence Pack (backend)
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  qa-assess:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m pip install -U pip
+          if (Test-Path "requirements.txt") { python -m pip install -r requirements.txt }
+          if (Test-Path "requirements-dev.txt") { python -m pip install -r requirements-dev.txt }
+          python -m pip install pip-audit bandit detect-secrets
+
+      - name: Run qa_assess
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts\qa_assess | Out-Null
+          python tools/qa_assess.py . artifacts\qa_assess artifacts\qa_assess\security-assessment.md artifacts\qa_assess\privacy-assessment.md artifacts\qa_assess\links.json
+
+      - name: Normalize pip-audit json
+        shell: pwsh
+        run: |
+          $p = "artifacts\qa_assess\pip_audit.json"
+          if (Test-Path $p) {
+            (Get-Content $p -TotalCount 1) | Set-Content "artifacts\qa_assess\pip_audit.clean.json"
+            (Get-Content $p -Tail 1) | Set-Content "artifacts\qa_assess\pip_audit.summary.txt"
+          }
+
+      - name: Remove raw pip-audit json
+        shell: pwsh
+        run: |
+          Remove-Item "artifacts\qa_assess\pip_audit.json" -ErrorAction SilentlyContinue
+
+      - name: Patch links.json for CI artifacts
+        shell: pwsh
+        run: |
+          @'
+          {
+            "reports": [
+              { "label": "Security assessment (markdown)", "href": "security-assessment.md" },
+              { "label": "Privacy assessment (markdown)", "href": "privacy-assessment.md" },
+              { "label": "pip-audit (json)", "href": "pip_audit.clean.json" },
+              { "label": "pip-audit (summary)", "href": "pip_audit.summary.txt" },
+              { "label": "bandit (json)", "href": "bandit.json" },
+              { "label": "detect-secrets (json)", "href": "detect_secrets.json" }
+            ]
+          }
+          '@ | Set-Content "artifacts\qa_assess\links.json"
+
+      - name: Generate manifest (sha256)
+        shell: pwsh
+        run: |
+          $dir = "artifacts\qa_assess"
+          Get-ChildItem $dir -File |
+            Where-Object { $_.Name -ne "manifest.sha256" } |
+            Sort-Object Name |
+            ForEach-Object {
+              $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+              "$h *$($_.Name)"
+            } | Set-Content "$dir\manifest.sha256"
+
+      - name: Upload evidence pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend_qa_assess_evidence
+          path: artifacts/qa_assess
