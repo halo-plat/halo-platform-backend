@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -32,7 +32,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install deps (backend + QA) and run harness
+      - name: Checkout integration repo
+  uses: actions/checkout@v4
+  with:
+    repository: halo-plat/halo-platform-integration
+    path: halo-platform-integration
+    fetch-depth: 1
+
+- name: Install deps (backend + QA) and run harness
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
