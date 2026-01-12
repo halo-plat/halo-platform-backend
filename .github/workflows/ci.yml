@@ -2,9 +2,9 @@
 
 on:
   push:
-    branches: [ "main", "feature/**" ]
+    branches: ["main", "feature/**"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,6 @@ permissions:
 jobs:
   local-ci-harness:
     runs-on: windows-latest
-
     steps:
       - name: Checkout backend
         uses: actions/checkout@v4
@@ -26,6 +25,14 @@ jobs:
           repository: halo-plat/halo-platform-qa
           token: ${{ secrets.HALO_QA_READ_TOKEN }}
           path: halo-platform-qa
+
+      - name: Checkout integration repo (sibling repo)
+        uses: actions/checkout@v4
+        with:
+          repository: halo-plat/halo-platform-integration
+          token: ${{ secrets.HALO_QA_READ_TOKEN }}
+          path: halo-platform-integration
+          fetch-depth: 1
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -40,6 +47,7 @@ jobs:
           # Backend venv + deps
           python -m venv .\halo-platform-backend\.venv
           .\halo-platform-backend\.venv\Scripts\python.exe -m pip install -U pip pytest
+
           if (Test-Path ".\halo-platform-backend\requirements.txt") {
             .\halo-platform-backend\.venv\Scripts\python.exe -m pip install -r .\halo-platform-backend\requirements.txt
           }
@@ -50,6 +58,10 @@ jobs:
           # QA venv + deps
           python -m venv .\halo-platform-qa\.venv
           .\halo-platform-qa\.venv\Scripts\python.exe -m pip install -U pip pytest
+
+          # QA test deps (TestClient)
+          .\halo-platform-qa\.venv\Scripts\python.exe -m pip install fastapi httpx
+
           if (Test-Path ".\halo-platform-qa\requirements.txt") {
             .\halo-platform-qa\.venv\Scripts\python.exe -m pip install -r .\halo-platform-qa\requirements.txt
           }
