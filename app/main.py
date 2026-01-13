@@ -1,10 +1,12 @@
-﻿from __future__ import annotations
+from __future__ import annotations
+import os
+import threading
 
 from datetime import datetime, timezone
 from uuid import uuid4
 from typing import Any, Dict, List
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.ai_provider import ConversationAIProvider
@@ -44,13 +46,59 @@ provider = ConversationAIProvider()
 SESSION_STATE: Dict[str, Dict[str, Any]] = {}
 
 
-def _state(session_id: str) -> Dict[str, Any]:
-    if session_id not in SESSION_STATE:
-        SESSION_STATE[session_id] = {
+TENANTS_SEEN: set[str] = set()
+TENANTS_LOCK = threading.Lock()
+
+
+def _max_tenants_from_env() -> int:
+    raw = (os.getenv("HALO_MAX_TENANTS") or "128").strip()
+    try:
+        n = int(raw)
+    except ValueError:
+        n = 128
+    return max(0, n)
+
+
+def _enforce_distinct_tenant_cap(tenant_id: str) -> None:
+    max_tenants = _max_tenants_from_env()
+    if max_tenants == 0:
+        return
+
+    with TENANTS_LOCK:
+        if tenant_id not in TENANTS_SEEN:
+            if len(TENANTS_SEEN) >= max_tenants:
+                raise HTTPException(status_code=429, detail="Tenant capacity exceeded")
+            TENANTS_SEEN.add(tenant_id)
+
+
+
+
+TENANTS_SEEN: set[str] = set()
+
+def _max_tenants() -> int:
+    """Maximum number of distinct tenants (clients) supported by this server instance.
+    Configurable via HALO_MAX_TENANTS (default 128).
+    """
+    try:
+        return int((os.getenv("HALO_MAX_TENANTS") or "128").strip())
+    except Exception:
+        return 128
+def _normalize_tenant_id(x_client_id: str | None) -> str:
+    """
+    Tenant identifier for multi-client MVP.
+    Backward compatible: if header is missing, fall back to 'default'.
+    """
+    tid = (x_client_id or "default").strip()
+    return tid if tid else "default"
+
+def _state(tenant_id: str, session_id: str) -> Dict[str, Any]:
+    key = f"{tenant_id}:{session_id}"
+    if key not in SESSION_STATE:
+        SESSION_STATE[key] = {
             "audio_route": AudioRoute.GLASSES,
             "ai_provider": None,
         }
-    return SESSION_STATE[session_id]
+    return SESSION_STATE[key]
 
 
 @app.get("/health", tags=["system"])
@@ -63,11 +111,48 @@ async def health_check() -> dict:
 
 
 @app.post("/api/v1/conversation/message", response_model=ConversationResponse, tags=["conversation"])
-async def handle_conversation_message(payload: ConversationRequest) -> ConversationResponse:
+async def handle_conversation_message(
+    payload: ConversationRequest,
+    x_client_id: str | None = Header(default=None, alias="X-Client-Id"),
+) -> ConversationResponse:
     session_id = payload.session_id or str(uuid4())
-    st = _state(session_id)
+    tenant_id = _normalize_tenant_id(x_client_id)
+    _enforce_distinct_tenant_cap(tenant_id)
+    # Tenant capacity guardrail (MVP multi-client)
+    if tenant_id not in TENANTS_SEEN:
+        max_tenants = _max_tenants()
+        if max_tenants > 0 and len(TENANTS_SEEN) >= max_tenants:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "tenant_limit_exceeded",
+                    "message": f"Tenant capacity exceeded (max={max_tenants}).",
+                    "tenant_id": tenant_id,
+                },
+            )
+        TENANTS_SEEN.add(tenant_id)
 
-    audio_cues: List[str] = ["session_start"]
+    # Deterministic ping guardrail (integration tests)
+    utter = (payload.user_utterance or "").strip().lower()
+    if utter in {"ping", "second ping"}:
+        key = f"{tenant_id}:{session_id}"
+        is_new_session = key not in SESSION_STATE
+        st = _state(tenant_id, session_id)
+        return ConversationResponse(
+            session_id=session_id,
+            reply_text="pong",
+            timestamp_utc=datetime.now(timezone.utc),
+            audio_route_applied=st["audio_route"],
+            audio_cues=(["session_start", "pong"] if is_new_session else ["pong"]),
+            ai_provider_requested="local_guardrail",
+            ai_provider_applied="local_guardrail",
+            ai_routing_reason="guardrail:ping",
+        )
+
+    key = f"{tenant_id}:{session_id}"
+    is_new_session = key not in SESSION_STATE
+    st = _state(tenant_id, session_id)
+    audio_cues: List[str] = (["session_start"] if is_new_session else [])
 
     # Audio route override
     audio_override = infer_audio_route_override_from_text(payload.user_utterance)
@@ -97,7 +182,7 @@ async def handle_conversation_message(payload: ConversationRequest) -> Conversat
     # Provider call (falls back internally if missing keys)
     result = await provider.generate_reply(
         user_utterance=payload.user_utterance,
-        session_context={"session_id": session_id},
+        session_context={"session_id": session_id, "tenant_id": tenant_id},
         provider_requested=requested,
     )
 

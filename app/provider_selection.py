@@ -62,7 +62,16 @@ def infer_ai_provider_override_from_text(user_text: str) -> Optional[AIProviderI
             {"perplexity"},
             {"pplx"},
         ]),
-        (AIProviderId.CLOUD_AI, [
+                (AIProviderId.CLAUDE, [
+            {"claude"},
+            {"anthropic"},
+        ]),
+        (AIProviderId.HUGGINGFACE, [
+            {"hugging", "face"},
+            {"huggingface"},
+            {"hf"},
+        ]),
+(AIProviderId.CLOUD_AI, [
             {"cloud", "ai"},
             {"gemini"},
             {"google", "ai"},
@@ -143,5 +152,9 @@ def pick_provider_for_request(user_text: str) -> AIProviderId:
     )
     if any(tok in t for tok in search_tokens):
         return AIProviderId.PERPLEXITY
+
+    # Claude and Hugging Face are explicit-override providers in MVP;
+    # no implicit auto-routing to avoid unexpected cost/latency shifts.
+
 
     return default_provider
