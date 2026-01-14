@@ -49,3 +49,14 @@ Requisiti GDPR & Security
 
 Esempio business
 Disdetta abbonamento Perplexity: il provider resta integrato ma viene marcato disabled via HALO_AI_PROVIDERS_DISABLED=perplexity oppure via comando vocale, evitando chiamate e costi.
+
+## Security & GDPR (protected bootstrap config)
+
+Requisito: la configurazione iniziale di gating (allow/deny dei provider) deve essere acquisita e trasmessa in forma cifrata e autenticata, usando lo stesso schema/protocollo di protezione adottato per le comunicazioni tra i device del sistema (es. handshake, session keys, mutual auth).
+
+Vincoli:
+- Nessun segreto o token in chiaro su log/telemetria; redaction obbligatoria.
+- A riposo (at-rest): storage protetto (OS key store / secret store) e integrità (tamper-evidence).
+- Separazione per-tenant: policy isolata e auditabile (actor, timestamp, canale: voice/config/api).
+- Least privilege: il gating non deve richiedere esposizione delle API key dei provider al layer voice.
+
