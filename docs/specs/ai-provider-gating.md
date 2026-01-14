@@ -1,22 +1,28 @@
 ﻿# AI provider gating (config + voice)
 
 Obiettivo
-Rendere governabile (enable/disable) laccesso a uno o più motori AI (AI engines) sia via configurazione iniziale sia dinamicamente via comando vocale dagli smart glasses. Il codice di integrazione resta presente anche quando un provider è marcato NON UTILIZZABILE.
+Rendere governabile (enable/disable) laccesso a uno o più motori AI (AI engines) sia via configurazione iniziale sia dinamicamente via comando vocale dagli smart glasses. Il codice di integrazione resta presente anche quando un provider è marcato come NON UTILIZZABILE.
 
-Scope
-- Backend: applicazione policy di abilitazione/disabilitazione nella selezione provider e nelle chiamate upstream.
-- Control-plane: endpoint/command bus per aggiornare la policy a runtime (per-tenant).
-- UX/Voice: mapping comandi vocali  intent  richiesta al backend (auditabile).
+Ambito
+Backend: applicazione della policy nella provider selection (routing) e nelle chiamate upstream.
+Control-plane: API per aggiornare la policy a runtime (per-tenant), con audit.
+UX/Voice: mapping intent vocali  richiesta al backend (auditabile).
+
+Terminologia
+Provider: identificativo canonico lowercase (es. openai, claude, huggingface, perplexity).
+Policy: insieme di regole che determina quali provider sono attivi per un tenant.
 
 Modello di policy
-1) Config statica (bootstrap)
-- Env var: HALO_AI_PROVIDERS_ENABLED (CSV) es. "openai,claude,huggingface" (assenza = default allow-all).
-- Env var: HALO_AI_PROVIDERS_DISABLED (CSV) es. "perplexity" (override di deny).
-- Regola: se ENABLED è valorizzata, è allowlist; DISABLED è denylist additiva.
 
-2) Config dinamica (runtime)
-- Stato per-tenant: providerPolicy.enabled[] / providerPolicy.disabled[] + timestamp + actor (voice/config/api).
-- Precedenza: runtime > bootstrap. Persistenza: (MVP) in-memory + export su artifact di audit; (post-MVP) KV store.
+1) Bootstrap (config iniziale)
+- HALO_AI_PROVIDERS_ENABLED (CSV): allowlist opzionale (es. "openai,claude,huggingface"). Se valorizzata, solo questi provider sono candidabili.
+- HALO_AI_PROVIDERS_DISABLED (CSV): denylist additiva (es. "perplexity"). Vale anche se ENABLED è valorizzata.
+- Regola: se ENABLED è valorizzata  modalità ALLOWLIST; altrimenti  ALLOW_ALL. In entrambi i casi, DISABLED sottrae.
+
+2) Runtime (config dinamica)
+- Stato per-tenant: providerPolicy.mode (ALLOW_ALL|ALLOWLIST), providerPolicy.enabled[], providerPolicy.disabled[], providerPolicy.allDisabled (bool), updatedAt, actor (voice|api|config), reason.
+- Precedenza: runtime > bootstrap.
+- Persistenza: MVP in-memory + export audit (artefatto); post-MVP KV store/DB.
 
 Comandi vocali (smart glasses)
 - Halo, disabilita Perplexity  disable(provider=perplexity)
@@ -24,13 +30,22 @@ Comandi vocali (smart glasses)
 - Halo, disabilita tutti i motori  disable(all)
 - Halo, abilita tutti i motori  enable(all)
 - Halo, quali motori sono attivi?  query(policy)
-Nota: i nomi provider sono normalizzati (lowercase, canonical id).
+
+Semantica operativa (idempotente)
+- disable(provider): aggiunge provider a disabled[]
+- enable(provider): rimuove provider da disabled[]; se mode=ALLOWLIST aggiunge anche a enabled[]
+- disable(all): allDisabled=true (nessun provider candidabile)
+- enable(all): allDisabled=false; mode=ALLOW_ALL; enabled=[]; disabled=[]
 
 Comportamento applicativo
-- Provider disabilitato: escluso dalla provider selection (routing) e da ogni failover automatico.
-- Se tutti i provider risultano disabilitati: risposta controllata con errore no provider available + istruzione operativa per riabilitare (voice/config).
-- Telemetria/audit: log evento policy-change (tenant, actor, delta, reason) + log di decisione di routing (provider esclusi per policy).
+- Provider disabilitato: escluso dalla provider selection e da ogni failover automatico.
+- Se tutti i provider risultano disabilitati: risposta controllata no provider available con istruzione operativa per riabilitare (voice/config).
+- Telemetria/audit: log evento policy-change (tenant, actor, delta, reason) + log decisione routing (provider esclusi per policy).
+
+Requisiti GDPR & Security
+- La configurazione bootstrap e ogni change runtime devono transitare su canale cifrato e autenticato, usando lo stesso protocollo di trasmissione già adottato per le comunicazioni devicebackend nel sistema (confidenzialità, integrità, autenticazione).
+- Minimizzazione: non persistere audio; persistere solo intent normalizzato (azione, provider, tenant, timestamp, actor, reason).
+- Access control: policy-change solo da soggetti autenticati/autorized (tenant-scoped) e tracciati in audit log.
 
 Esempio business
-Scenario: disdetta abbonamento Perplexity  provider perplexity resta integrato ma viene marcato disabled via HALO_AI_PROVIDERS_DISABLED=perplexity oppure via comando vocale, evitando chiamate e costi.
-
+Disdetta abbonamento Perplexity: il provider resta integrato ma viene marcato disabled via HALO_AI_PROVIDERS_DISABLED=perplexity oppure via comando vocale, evitando chiamate e costi.
